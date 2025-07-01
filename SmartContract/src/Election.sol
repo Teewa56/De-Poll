@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
@@ -93,7 +93,7 @@ contract Election {
         IUserContract(userContract).AddUserElection(msg.sender, _electionId, _electionName);
     }
 
-    function vote(uint _electionId, string memory _candidateName) external {
+    function vote(uint _electionId, string memory _candidateName) external payable{
         ElectionData storage election = elections[_electionId];
         Voter storage voter = voters[msg.sender][_electionId];
 
@@ -154,7 +154,7 @@ contract Election {
         return elections[_electionId].votes[_candidateName];
     }
 
-    function getTopElections() external returns (uint[] memory) {
+    function getTopElections() external view returns (uint[] memory) {
         uint maxVotes = 0;
         for (uint i = 0; i < closedElections.length; i++) {
             uint highestVotes = 0;

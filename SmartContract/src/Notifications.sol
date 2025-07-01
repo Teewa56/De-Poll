@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.28;
 
 contract Notifications {
     event VoteNotification(address indexed voter, string indexed votedFor, uint256 electionId, uint256 timestamp);

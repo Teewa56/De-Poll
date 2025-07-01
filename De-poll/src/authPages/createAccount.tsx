@@ -7,7 +7,7 @@ import Toast from './toast';
 //and manage with the use of a context
 const CreateAccount = () => {
 
-    const [userAddress, setUserAddress] = useState("");
+    const [userAddress, setUserAddress] = useState<string>("");
     const [userName, setUserName] = useState("");
     const [imageUrl, setImageUrl] = useState<null | string>(null)
     const [Avatar, setAvatar] = useState<null | string>("");
@@ -31,8 +31,10 @@ const CreateAccount = () => {
             const res = await axios.post(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
             formData)
             setImageUrl(res.data.secure_url)
-        }catch(err: unknown){
-            setError(err.res?.message || err.message);
+        }catch(err){
+            if(err instanceof Error){
+                setError(err.message)
+            }
         }
     };
 
@@ -42,7 +44,7 @@ const CreateAccount = () => {
 
     return(
         <div className="is-fullheight m-2 " >
-            {}
+            {error && <Toast text={error} /> }
             <p>Welcome, lets set up your account</p>
             <div>
                 <label htmlFor="userName">
@@ -55,7 +57,7 @@ const CreateAccount = () => {
                         {images.map((image, index) => {
                             const {ref, inView} = useInview({
                                 threshold : 0.5,
-                                onchange: (inView) => {
+                                onchange: (inView: string) => {
                                     if(inView) setAvatar(image.src);
                                 },
                             });  
