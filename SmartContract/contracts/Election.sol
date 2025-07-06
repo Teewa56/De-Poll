@@ -4,20 +4,28 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 interface INotifications {
-    function VoteNotification(address _voter, string memory _votedFor, uint256 _electionId) external;
-    function NotifyVoteCreator(address _creator, address _voter, string memory _votedFor, uint256 _electionId) external;
+    function voteNotification(address _voter, string memory _votedFor, uint256 _electionId) external;
+    function notifyVoteCreator(address _creator, address _voter, string memory _votedFor, uint256 _electionId) external;
+    function paymentReceived(address _sender, address _receiver, uint256 _amount) external;
+    function paymentSent(address _sender, address _receiver, uint256 _amount) external;
+    function notifyUserForElection(address _voter, uint256 _electionId, string memory _electionName) external;
+    function notifyGameWin(address _player, uint256 _pointsEarned) external;
 }
 
 interface IPayment {
     function payForVoteCreation(address _senderAddress) external;
     function payForVoting(address _voterAddress, address _voteCreator) external;
+    function signUpGift(address _receiverAddress) external;
 }
 
 interface IUserContract {
-    function AddUserElection(address _userAddress, uint _electionId, string memory _electionName) external;
-    function AddUserParticipatingElections(address _userAddress, uint _electionId, string memory _electionName) external;
+    function addUserElection(address _userAddress, uint _electionId, string memory _electionName) external;
+    function addUserParticipatingElections(address _userAddress, uint _electionId, string memory _electionName) external;
 }
 
+// =======================
+// ELECTION CONTRACT
+// =======================
 contract Election {
     ERC20 public rewardsToken;
 
@@ -29,7 +37,7 @@ contract Election {
         uint closeTime;
         mapping(string => uint) votes;
         mapping(address => bool) allowedVoters;
-        mapping(address => uint) earnedPoints; // Points earned by voters
+        mapping(address => uint) earnedPoints;
     }
 
     struct Voter {
@@ -72,7 +80,8 @@ contract Election {
         address[] memory _allowedVoters,
         uint _closeTime
     ) external AllowedVoteCreators {
-        require(!elections[_electionId].ongoing, "Election ID already exists");
+        require(!elections[_electionId].ongoing && bytes(elections[_electionId].electionName).length == 0, "Election ID already exists");
+        require(_closeTime > block.timestamp, "Close time must be in the future");
 
         ElectionData storage election = elections[_electionId];
         election.electionName = _electionName;
@@ -86,14 +95,14 @@ contract Election {
 
         for (uint i = 0; i < _allowedVoters.length; i++) {
             election.allowedVoters[_allowedVoters[i]] = true;
-            election.earnedPoints[_allowedVoters[i]] = 0; // Initialize points
+            election.earnedPoints[_allowedVoters[i]] = 0;
         }
 
         ongoingElections.push(_electionId);
-        IUserContract(userContract).AddUserElection(msg.sender, _electionId, _electionName);
+        IUserContract(userContract).addUserElection(msg.sender, _electionId, _electionName);
     }
 
-    function vote(uint _electionId, string memory _candidateName) external payable{
+    function vote(uint _electionId, string memory _candidateName) external {
         ElectionData storage election = elections[_electionId];
         Voter storage voter = voters[msg.sender][_electionId];
 
@@ -116,12 +125,11 @@ contract Election {
         voter.hasVoted = true;
         voter.votedFor = _candidateName;
 
-        INotifications(notificationContract).VoteNotification(msg.sender, _candidateName, _electionId);
-        INotifications(notificationContract).NotifyVoteCreator(election.creator, msg.sender, _candidateName, _electionId);
+        INotifications(notificationContract).voteNotification(msg.sender, _candidateName, _electionId);
+        INotifications(notificationContract).notifyVoteCreator(election.creator, msg.sender, _candidateName, _electionId);
 
-        // Reward voter with points
         election.earnedPoints[msg.sender] += 10;
-        rewardsToken.transfer(msg.sender, 10 * (10 ** rewardsToken.decimals())); // Distribute token rewards
+        rewardsToken.transfer(msg.sender, 10 * (10 ** rewardsToken.decimals()));
     }
 
     function getUserPoints(uint _electionId, address _user) external view returns (uint) {
@@ -134,6 +142,15 @@ contract Election {
         require(block.timestamp >= election.closeTime, "Election is still ongoing");
 
         election.ongoing = false;
+        
+        for (uint i = 0; i < ongoingElections.length; i++) {
+            if (ongoingElections[i] == _electionId) {
+                ongoingElections[i] = ongoingElections[ongoingElections.length - 1];
+                ongoingElections.pop();
+                break;
+            }
+        }
+        
         closedElections.push(_electionId);
     }
 
@@ -142,6 +159,7 @@ contract Election {
             if (elections[closedElections[i]].closeTime + 24 * 60 * 60 < block.timestamp) {
                 closedElections[i] = closedElections[closedElections.length - 1];
                 closedElections.pop();
+                i--; 
             }
         }
     }
@@ -155,6 +173,8 @@ contract Election {
     }
 
     function getTopElections() external view returns (uint[] memory) {
+        delete topElections; // Clear previous results
+        
         uint maxVotes = 0;
         for (uint i = 0; i < closedElections.length; i++) {
             uint highestVotes = 0;

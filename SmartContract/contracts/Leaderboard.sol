@@ -14,28 +14,40 @@ contract Leaderboard is Ownable {
     }
 
     mapping(uint => PlayerScore[]) public leaderboards;
-    IGameContract public gameContract;
+    mapping(uint => uint) public leaderboardCounts;
+    address public gameContract;
 
     event LeaderboardUpdated(uint gameId, address indexed player, uint score);
 
     constructor(address _owner, address _gameContract) Ownable(_owner) {
-        gameContract = IGameContract(_gameContract);
+        gameContract = _gameContract;
     }
 
     function updateLeaderboard(uint _gameId, address _player) external onlyOwner {
-        uint playerScore = gameContract.getUserPoints(_gameId, _player);
+        require(gameContract != address(0), "Game contract not set");
+        uint playerScore = IGameContract(gameContract).getUserPoints(_gameId, _player);
         require(playerScore > 0, "Player has no recorded score");
 
         leaderboards[_gameId].push(PlayerScore({player: _player, score: playerScore}));
+        leaderboardCounts[_gameId]++;
 
         emit LeaderboardUpdated(_gameId, _player, playerScore);
     }
 
     function getLeaderboard(uint _gameId) external view returns (PlayerScore[] memory) {
-        return leaderboards[_gameId];
+        uint count = leaderboardCounts[_gameId];
+        PlayerScore[] memory scores = new PlayerScore[](count);
+        for (uint i = 0; i < count; i++) {
+            scores[i] = leaderboards[_gameId][i];
+        }
+        return scores;
     }
 
     function setGameContract(address _newGameContract) external onlyOwner {
-        gameContract = IGameContract(_newGameContract);
+        gameContract = _newGameContract;
     }
+}
+
+interface IGameContract {
+    function getUserPoints(uint _gameId, address _user) external view returns (uint);
 }

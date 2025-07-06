@@ -13,7 +13,8 @@ contract GameContract is Ownable {
         uint highScore;
         address[] gamers;
         address[] topPlayers;
-        address[] onlinePlayers;
+        uint gamersCount;
+        uint topPlayersCount;
         mapping(address => uint) scores;
         mapping(address => uint) earnedPoints;
     }
@@ -21,6 +22,7 @@ contract GameContract is Ownable {
     mapping(uint => Game) public games;
     mapping(address => uint[]) public userGames;
     mapping(address => bool) public isOnline;
+    address[] public onlinePlayers;
 
     address public notificationContractAddress;
 
@@ -45,7 +47,9 @@ contract GameContract is Ownable {
         require(games[_gameId].scores[msg.sender] == 0, "You have already started this game");
 
         games[_gameId].gamers.push(msg.sender);
+        games[_gameId].gamersCount++;
         games[_gameId].scores[msg.sender] = 0;
+        userGames[msg.sender].push(_gameId);
         emit GameStarted(_gameId, msg.sender);
     }
 
@@ -58,48 +62,82 @@ contract GameContract is Ownable {
 
         if (games[_gameId].scores[_winnerAddress] > games[_gameId].highScore) {
             games[_gameId].highScore = games[_gameId].scores[_winnerAddress];
-        }
-
-        if (games[_gameId].scores[_winnerAddress] == games[_gameId].highScore) {
+            // Clear previous top players and add new one
+            delete games[_gameId].topPlayers;
+            games[_gameId].topPlayersCount = 0;
             games[_gameId].topPlayers.push(_winnerAddress);
+            games[_gameId].topPlayersCount++;
+        } else if (games[_gameId].scores[_winnerAddress] == games[_gameId].highScore && games[_gameId].highScore > 0) {
+            games[_gameId].topPlayers.push(_winnerAddress);
+            games[_gameId].topPlayersCount++;
         }
 
         emit GameEnded(_gameId, _winnerAddress, games[_gameId].scores[_winnerAddress]);
 
         if (_isWinner) {
-            INotification(notificationContractAddress).notifyGameWin(_winnerAddress, _pointsEarned);
+            INotifications(notificationContractAddress).notifyGameWin(_winnerAddress, _pointsEarned);
         }
     }
 
     function getTopPlayers(uint _gameId) external view returns (address[] memory) {
-        return games[_gameId].topPlayers;
+        uint count = games[_gameId].topPlayersCount;
+        address[] memory topPlayers = new address[](count);
+        for (uint i = 0; i < count; i++) {
+            topPlayers[i] = games[_gameId].topPlayers[i];
+        }
+        return topPlayers;
     }
 
     function goOnline() external {
-        isOnline[msg.sender] = true;
-        emit PlayerOnline(msg.sender);
+        if (!isOnline[msg.sender]) {
+            isOnline[msg.sender] = true;
+            onlinePlayers.push(msg.sender);
+            emit PlayerOnline(msg.sender);
+        }
     }
 
     function goOffline() external {
-        isOnline[msg.sender] = false;
-        emit PlayerOffline(msg.sender);
+        if (isOnline[msg.sender]) {
+            isOnline[msg.sender] = false;
+            // Remove from online players array
+            for (uint i = 0; i < onlinePlayers.length; i++) {
+                if (onlinePlayers[i] == msg.sender) {
+                    onlinePlayers[i] = onlinePlayers[onlinePlayers.length - 1];
+                    onlinePlayers.pop();
+                    break;
+                }
+            }
+            emit PlayerOffline(msg.sender);
+        }
     }
 
     function getOnlinePlayers(uint _gameId) external view returns (address[] memory) {
-        address[] memory onlineList = new address[](games[_gameId].gamers.length);
+        uint count = 0;
+        for (uint i = 0; i < games[_gameId].gamersCount; i++) {
+            if (isOnline[games[_gameId].gamers[i]]) {
+                count++;
+            }
+        }
+        address[] memory onlineList = new address[](count);
         uint index = 0;
-
-        for (uint i = 0; i < games[_gameId].gamers.length; i++) {
+        for (uint i = 0; i < games[_gameId].gamersCount; i++) {
             if (isOnline[games[_gameId].gamers[i]]) {
                 onlineList[index] = games[_gameId].gamers[i];
                 index++;
             }
         }
-
         return onlineList;
+    }
+
+    function getAllOnlinePlayers() external view returns (address[] memory) {
+        return onlinePlayers;
     }
 
     function getUserPoints(uint _gameId, address _user) external view returns (uint) {
         return games[_gameId].earnedPoints[_user];
+    }
+
+    function getUserGames(address _user) external view returns (uint[] memory) {
+        return userGames[_user];
     }
 }
