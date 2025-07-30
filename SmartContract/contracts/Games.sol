@@ -75,7 +75,7 @@ contract GameContract is Ownable {
         emit GameEnded(_gameId, _winnerAddress, games[_gameId].scores[_winnerAddress]);
 
         if (_isWinner) {
-            INotifications(notificationContractAddress).notifyGameWin(_winnerAddress, _pointsEarned);
+            INotification(notificationContractAddress).notifyGameWin(_winnerAddress, _pointsEarned);
         }
     }
 

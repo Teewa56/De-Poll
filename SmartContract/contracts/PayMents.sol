@@ -5,8 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface INotifications {
-    function PaymentReceived(address _sender, address _receiver, uint256 _amount) external;
-    function PaymentSent(address _sender, address _receiver, uint256 _amount) external;
+    function paymentReceived(address _sender, address _receiver, uint256 _amount) external;
+    function paymentSent(address _sender, address _receiver, uint256 _amount) external;
 }
 
 contract Payments is Ownable {

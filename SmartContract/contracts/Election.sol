@@ -50,7 +50,7 @@ contract Election {
     mapping(address => bool) public allowedVoteCreators;
     uint[] public ongoingElections;
     uint[] public closedElections;
-    uint[] public topElections;
+    uint[] public topElections; // This can be removed if using Solution 2
 
     address public immutable notificationContract;
     address public immutable paymentContract;
@@ -172,23 +172,51 @@ contract Election {
         return elections[_electionId].votes[_candidateName];
     }
 
+    // Solution 2: Keep as 'view' and calculate dynamically without modifying state
     function getTopElections() external view returns (uint[] memory) {
-        delete topElections; // Clear previous results
+        // Create a temporary array to hold results
+        uint[] memory tempTopElections = new uint[](closedElections.length);
+        uint topCount = 0;
         
         uint maxVotes = 0;
+        
+        // First pass: find the maximum vote count across all elections
         for (uint i = 0; i < closedElections.length; i++) {
-            uint highestVotes = 0;
+            uint highestVotesInElection = 0;
             for (uint j = 0; j < elections[closedElections[i]].candidatesName.length; j++) {
                 string memory candidateName = elections[closedElections[i]].candidatesName[j];
-                if (elections[closedElections[i]].votes[candidateName] > highestVotes) {
-                    highestVotes = elections[closedElections[i]].votes[candidateName];
+                uint candidateVotes = elections[closedElections[i]].votes[candidateName];
+                if (candidateVotes > highestVotesInElection) {
+                    highestVotesInElection = candidateVotes;
                 }
             }
-            if (highestVotes > maxVotes) {
-                maxVotes = highestVotes;
-                topElections.push(closedElections[i]);
+            if (highestVotesInElection > maxVotes) {
+                maxVotes = highestVotesInElection;
             }
         }
-        return topElections;
+        
+        // Second pass: collect elections with the maximum vote count
+        for (uint i = 0; i < closedElections.length; i++) {
+            uint highestVotesInElection = 0;
+            for (uint j = 0; j < elections[closedElections[i]].candidatesName.length; j++) {
+                string memory candidateName = elections[closedElections[i]].candidatesName[j];
+                uint candidateVotes = elections[closedElections[i]].votes[candidateName];
+                if (candidateVotes > highestVotesInElection) {
+                    highestVotesInElection = candidateVotes;
+                }
+            }
+            if (highestVotesInElection == maxVotes) {
+                tempTopElections[topCount] = closedElections[i];
+                topCount++;
+            }
+        }
+        
+        // Create final array with correct size
+        uint[] memory result = new uint[](topCount);
+        for (uint i = 0; i < topCount; i++) {
+            result[i] = tempTopElections[i];
+        }
+        
+        return result;
     }
 }

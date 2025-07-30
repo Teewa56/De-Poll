@@ -47,7 +47,3 @@ contract Leaderboard is Ownable {
         gameContract = _newGameContract;
     }
 }
-
-interface IGameContract {
-    function getUserPoints(uint _gameId, address _user) external view returns (uint);
-}
